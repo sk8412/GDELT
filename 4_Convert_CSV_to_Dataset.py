@@ -3,11 +3,9 @@ import timeit
 import html
 import re
 
-# Main data folder
-#DF_MAIN = 'C:\\Users\\2bowb\\Documents\\Thesis\\'
 
 # Data file name
-FN_DATA = 'articles_labeled.csv'
+FN_DATA = 'articles_labeled_backup.csv'
 
 # Output file name
 FN_OUT = 'articles_dataset'
@@ -15,10 +13,7 @@ FN_OUT = 'articles_dataset'
 # read the csv file and convert it into a dataset object named 'dataset'
 start = timeit.default_timer()
 
-dataset = load_dataset('csv', data_files=FN_DATA, sep=",")
-
-end = timeit.default_timer()
-print("Conversion to Dataset:", {end - start}, "seconds")
+dataset = load_dataset('csv', data_files= FN_DATA, sep="\t")
 
 # Removing duplicates
 dsf = dataset.filter(lambda x: x["Text"] is not None)
@@ -59,3 +54,6 @@ print("Features of Dataset to be saved:", dataset_splits)
 out_fn = FN_OUT
 dataset_splits.save_to_disk(out_fn)
 print("\nWriting results to: {}".format(out_fn))
+
+end = timeit.default_timer()
+print("Conversion to Dataset:", {end - start}, "seconds")

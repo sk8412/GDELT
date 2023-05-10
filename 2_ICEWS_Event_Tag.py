@@ -25,18 +25,11 @@ def geo_dist(x1, y1, x2, y2, radius=6371):
     d = radius * c
     return d
 
-
-# Main data folder
-# DF_MAIN = 'C:\\Users\\2bowb\\Documents\\Thesis\\'
-# DF_MAIN = 'G:\\My Drive\\Theses\\Kyler\\'
-
 # GDELT file name
-FN_GDELT = 'results_filtered.csv'
-# FN_GDELT = 'thesis-gdelt-false-positives-master\\results_all_protest.csv'
+FN_GDELT = 'Protest_Events_All.csv'
 
 # ICEWS file name
 FN_ICEWS = 'events.2022.20230106.tab'
-# FN_ICEWS = 'events.2022.20230106.tab'
 
 # Output file name
 FN_OUT = 'results_tagged_v1.csv'

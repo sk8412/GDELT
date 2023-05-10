@@ -2,50 +2,113 @@
 
 # Imports
 from newspaper import Article
+from datetime import datetime
 import pandas as pd
+import time
+import os
+
 
 # Initializing variables
-count = 0
+count_success = 0
 count_fail = 0
+row_count = 0
+first_row = 1
 
-# Loading .csv of URLs to follow
-file_to_read = "results_tagged_v1.csv"
-# url = pd.read_csv(file_to_read, sep=',', header = 0, usecols=['GlobalEventID'])
-url = pd.read_csv(file_to_read, sep=',', header = 0, usecols = ['GlobalEventID', 'SOURCEURL', 'match30', 'match50', 'match70'])
+# Rows per file
+CHUNK_SIZE = 1000
+
+# Report frequency
+PRINT_FREQ = 10
+
+# Data file name
+FN_DATA = "/home/skyler/results_tagged_v1.csv"
+
+# Output file name
+FN_OUT = 'articles_{:09d}_{:09d}_{}.csv'
+
+# Output data folder
+DF_OUT = '/data2/skyler/gdelt_v3'
+
+url = pd.read_csv(FN_DATA, sep=",", header=0,
+                  usecols=["GlobalEventID", "SOURCEURL",
+                           "match30", "match50", "match70"])
+
+# Total number of rows to be analyzed
+total_count = str(url.shape[0])
 
 # Setting the column names to be used in the dataframe
-colnames = ['GlobalEventID', 'SOURCEURL', 'Title', 'Text', 'match30', 'match50', 'match70']
+colnames = ["GlobalEventID", "SOURCEURL", "Title", "Text",
+            "match30", "match50", "match70"]
 
-# Initializing the dataframes
-title_df = pd.DataFrame(columns=colnames)
-articles_df = pd.DataFrame(columns=colnames)
+# Initialize results list
+df_list = []
+
+# Start timer
+start_time = time.time()
 
 # Iterating through list of imported URLs
 for index, row in url.iterrows():
-    article = Article(row['SOURCEURL'])
+    article = Article(row["SOURCEURL"])
     article.download()
-    
+    row_count += 1
+
+    if row_count % PRINT_FREQ == 0:
+        print('Importing article number ' +
+              str(row_count) + ' of ' + str(total_count))
+
     # Checks if download was successful
     # Parses through downloaded article
     # Pulls title and text from article
-    if article.download_state == 2:     
+    if article.download_state == 2:
         article.parse()
         title = article.title
         text = article.text
 
-        # new_title consists of each title and text pulled from the article
-        # It is concatenated with articles_df, which keeps a list of all titles and texts
-        new_title = pd.DataFrame([[row['GlobalEventID'], row['SOURCEURL'], title, text, \
-                                   row['match30'], row['match50'], row['match70'], ]], columns=colnames)
-        articles_df = pd.concat([articles_df, new_title], ignore_index=True)
-        #print(title)
-        count += 1
-        print('Just completed importing article number:', count)
+        # Create output row
+        new_title = pd.DataFrame(
+            [[row["GlobalEventID"], row["SOURCEURL"], title, text,
+              row["match30"], row["match50"], row["match70"]]],
+            columns=colnames)
+        count_success += 1
+
     else:
-        #print(f'{row['SOURCEURL']} failed')
+        # print(f'{row['SOURCEURL']} failed')
+        new_title = pd.DataFrame(
+            [[row["GlobalEventID"], row["SOURCEURL"], "NA", "NA",
+              row["match30"], row["match50"], row["match70"]]],
+            columns=colnames)
         count_fail += 1
 
+    # Append new row to list
+    df_list.append(new_title)
+
+    if row_count % CHUNK_SIZE == 0:
+        print("Another 1000 articles processed. Script running for",
+              time.strftime("%H hr : %M min : %S sec",
+                            (time.gmtime(time.time() - start_time))))
+
+        # Concatenate data frames
+        articles_df = pd.concat(df_list, ignore_index=True)
+
+        # Create output file name
+        time_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+        fn = FN_OUT.format(first_row, row_count, time_str)
+        fn = os.path.join(DF_OUT, fn)
+        print("Writing file to csv:\n {}".format(fn))
+
+        # Save CSV
+        articles_df.to_csv(fn, index=False)
+
+        # Re-initialize list
+        df_list = []
+
+        # Set row counter (this will be the first row of the next file)
+        first_row = row_count + 1
+
 # Sends title and text of each article to a .csv
-articles_df.to_csv('articles_labeled.csv',index=False, sep=',', )
-print('Number of articles sucessfully imported to the csv:', count)
-print('Number of broken URLs:', count_fail)
+articles_df.to_csv(FN_OUT, index=False)
+print("\nNumber of articles sucessfully downloaded:", count_success)
+print("\nNumber of broken URLs:", count_fail)
+print("Total time elapsed:\n",
+      time.strftime("%H hr : %M min : %S sec",
+                    (time.gmtime(time.time() - start_time))))
