@@ -1,3 +1,7 @@
+# 5/23/23: Code compiled and modified by Seth Kyler
+# Based off code by CDR Milton Mendieta, Ecuadorian Navy:
+# https://github.com/m2im/violence_prediction/tree/main/Scripts
+
 from datasets import load_from_disk, Value
 from transformers import AutoTokenizer, DataCollatorWithPadding, get_scheduler
 from transformers import AutoModelForSequenceClassification, AdamW
@@ -14,32 +18,41 @@ torch.cuda.empty_cache()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-#wandb.login()
+wandb.login()
+run = wandb.init(
+    project="TrainingLoop_v2")
 
 # Data file name
-FN_DATA = 'articles_dataset'
+FN_DATA = '/data2/skyler2/articles_dataset_ru_v3'
+# FN_DATA = 'C:/Users/2bowb/Documents/Thesis/thesis-gdelt-false-positives/Datasets/articles_dataset_ru_v2'
 
 # Load the dataset
 dataset = load_from_disk(FN_DATA)
 
 # Convert label column to float, necessary for calculating loss
 new_features = dataset["train"].features.copy()
-new_features["match30"] = Value("float32")
+new_features["match70"] = Value("float32")
 dataset = dataset.cast(new_features)
 dataset["train"].features
 
 # Header with hyperparameters and other variables
 config = {
-    "model_ckpt": "setu4993/smaller-LaBSE", # "roberta-base",
-    "batch_size": 32,
+    "model_ckpt": 'sentence-transformers/LaBSE',
+    "batch_size": 4,
     "num_labels": 1,
     "init_lr": 5e-5,
-    "num_epochs": 5,
+    "num_epochs": 15,
     "num_warmup_steps": 0,
     "lr_scheduler_type": "linear", # cosine
     "weight_decay": 0.1,
     "seed": 42
 }
+
+# Pre-trained models
+# sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+# sentence-transformers/paraphrase-xlm-r-multilingual-v1
+# sentence-transformers/LaBSE
+
 
 args = Namespace(**config)
 
@@ -67,10 +80,10 @@ print(time.strftime(
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
 # Prepare for training by removing all columns except "input_ids", which is the column on which the model will train,
-# "match30", which is the column that will be used as labels, "token_type_ids", and "attention_mask"
-# "match30" must be changed to "labels" because that is the name the model expects
-tokenized_datasets = tokenized_datasets.remove_columns(["GlobalEventID", "SOURCEURL", "Title", "Text", "match50", "match70"])
-tokenized_datasets = tokenized_datasets.rename_column("match30", "labels")
+# "match70", which is the column that will be used as labels, "token_type_ids", and "attention_mask"
+# "match70" must be changed to "labels" because that is the name the model expects
+tokenized_datasets = tokenized_datasets.remove_columns(["GlobalEventID", "SOURCEURL", "Title", "Text", "match50", "match30"])
+tokenized_datasets = tokenized_datasets.rename_column("match70", "labels")
 
 # Define dataloaders used for transfering data to GPU
 train_dataloader = DataLoader(tokenized_datasets["train"], shuffle=True, batch_size=args.batch_size, collate_fn=data_collator)
@@ -103,14 +116,14 @@ lr_scheduler = get_scheduler(
 print("Number of training steps:", num_training_steps)
 
 # Prepare components for use on GPUs
-print("Preparing the components for use on GPUs. This may take a couple hours...")
 train_dataloader, eval_dataloader, model, optimizer, lr_scheduler = accelerator.prepare(train_dataloader, eval_dataloader, model, optimizer, lr_scheduler)
 
 # Training loop
+print('Training...')
 progress_bar = tqdm(range(num_training_steps))
 
-#wandb.init(settings=wandb.Settings(start_method="fork"))
-#wandb.init()
+wandb.init(settings=wandb.Settings(start_method="fork"))
+wandb.init()
 
 # Load required metrics
 accuracy_metric = evaluate.load("accuracy")
@@ -135,7 +148,7 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         progress_bar.update(1)
 
-        #wandb.log({'epoch': epoch, 'train_loss': loss.item()})
+        wandb.log({'epoch': epoch, 'train_loss': loss.item()})
 
     # Evaluate the model on the validation set
     if accelerator.is_main_process and ((step + 1) % (num_training_steps // num_epochs) == 0 or (step + 1) == num_training_steps):
@@ -146,7 +159,9 @@ print(time.strftime(
     "%H hr : %M min : %S sec",
     time.gmtime(time.time()-start_time_training)))
 
+
 # Evaluation loop
+print('Evaluating...')
 start_time_eval = time.time()
 
 model.eval()
@@ -159,7 +174,7 @@ for batch in eval_dataloader:
     precision_metric.add_batch(predictions=accelerator.gather(predictions), references=batch["labels"])
     recall_metric.add_batch(predictions=accelerator.gather(predictions), references=batch["labels"])
     f1_metric.add_batch(predictions=accelerator.gather(predictions), references=batch["labels"])
-    
+
 print("\nEvaluation Time elapsed:")
 print(time.strftime(
     "%H hr : %M min : %S sec",

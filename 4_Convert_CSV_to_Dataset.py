@@ -1,3 +1,7 @@
+# Code written and provided by CDR Milton Mendienta, Ecuadorian Navy
+# 5/23/2023: modified by Seth Kyler
+
+
 from datasets import load_dataset
 import timeit
 import html
@@ -5,7 +9,7 @@ import re
 
 
 # Data file name
-FN_DATA = 'articles_labeled_backup.csv'
+FN_DATA = 'articles_compiled.csv'
 
 # Output file name
 FN_OUT = 'articles_dataset'

@@ -1,4 +1,5 @@
-# code modified from: https://github.com/walfaelschung/GDELT_flow#readme
+# 5/23/2023: Code compliled by Seth Kyler
+# Modified from: https://github.com/walfaelschung/GDELT_flow#readme
 
 # Imports 
 import pandas as pd
@@ -12,27 +13,25 @@ import os
 from datetime import datetime
 
 # Specify year of interest
-# Can be edited to include month, ex: 202203
 YeartoSortZip = '2022'
-YeartoSortEntry = '2022'
 
 # Rows per file
 CHUNK_SIZE = 1000
 
 # Report frequency
-PRINT_FREQ = 10
+PRINT_FREQ = 100
 
 # Initializing counter
 ENTRY_COUNT = 1
 
 # Output file name
-FN_OUT = '/Protest_Events_All.csv'
+FN_OUT = '/protest_events_all_v2.csv'
 
 # Output backup file names
-FN_OUT_BU = 'Protest_Events_{:09d}_{:09d}_{}.csv'
+FN_OUT_BU = 'protest_events_v2{:09d}_{:09d}_{}.csv'
 
 # Output data folder
-DF_OUT = '/home/skyler/gdelt_protest_events'
+DF_OUT = '/data2/skyler2/gdelt_protest_events'
 
 # Pulls zip files from GDELT repository
 # Filters by events data and date in zip filename
@@ -66,13 +65,11 @@ colnames = ['GlobalEventID', 'Day','MonthYear','Year','FractionDate',
             ]
 
 # Initializing the dataframes
-result_df = pd.DataFrame(columns=colnames)
-filter_date_df = pd.DataFrame(columns=colnames)
+protest_df = pd.DataFrame(columns=colnames)
 
 # Initializing the lists
 finished_files =[]
 file_errors = []
-df_list = []
 
 # Initializing time
 start_time = time.time()
@@ -85,22 +82,21 @@ for a in urls:
     if ENTRY_COUNT % PRINT_FREQ == 0:
         print('Processing ' + 
               str(ENTRY_COUNT) + ' of ' + str(len(urls)))
-        
+
+    # Opens each zip folder and pulls out the protest events
     try:
         zf = zipfile.ZipFile(BytesIO(obj), 'r')
         filename = zf.namelist()
         
-        # Opens each zip file and pulls any entries that meet criteria
-        # Criteria: 14 = protest event
         with zf.open(filename[0], 'r') as csvfile:
             try:
                 df = pd.read_csv(csvfile, sep='\t', header=None, dtype={26: str,27:str,28:str})
                 df.columns=colnames
-                df['MonthYear'] = df['MonthYear'].astype('string')
-                protest_df = df.loc[df.EventBaseCode.str.startswith('14', na=False)]  # EVENT-FILTER HERE
-                filtered_by_date = protest_df.loc[protest_df.Year.str.fullmatch(YeartoSortEntry, na=False)] # YEAR-FILTER HERE
-                result_df = pd.concat([result_df, filtered_by_date])
-
+                
+                # Criteria: 14 = protest event
+                protestdf = df.loc[df.EventBaseCode.str.startswith('14', na=False)]
+                protest_df = pd.concat([protest_df, protestdf])
+                
             except EmptyDataError:
                 print('File was empty, moving on...')
                 file_errors.append(a)
@@ -111,18 +107,12 @@ for a in urls:
         print('Could not open zip file. Moving on...')
     finished_files.append(a)
 
-    # Append new row to list
-    df_list.append(result_df)
-
     # Saves backup files
     if ENTRY_COUNT % CHUNK_SIZE == 0:
         print('Another 1000 entries processed. Script running for',
               time.strftime('%H hr : %M min : %S sec',
                             (time.gmtime(time.time() - start_time))))
-
-        # Concatenate data frames
-        filtered_df = pd.concat(df_list, ignore_index=True)
-
+        
         # Create output file name
         time_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
         fn = FN_OUT_BU.format(ENTRY_COUNT, len(urls), time_str)
@@ -130,24 +120,18 @@ for a in urls:
         print('Writing file to csv:\n {}'.format(fn))
 
         # Save CSV
-        result_df.to_csv(fn, index=False)
-
-        # Re-initialize list
-        df_list = []
-
-        # Set row counter (this will be the first row of the next file)
-        first_row = ENTRY_COUNT + 1
+        protest_df.to_csv(fn, sep=',', index=False)        
 
 # Checks for duplicate entries
-result_final = result_df.drop_duplicates(subset = ['GlobalEventID'])
+result_final = protest_df.drop_duplicates(subset = ['GlobalEventID'])
+result_final = protest_df.drop_duplicates(subset = ['SOURCEURL'])
 
 # Sends entries from GDELT database to a CSV
-result_final.to_csv(DF_OUT + FN_OUT, index=False)
+result_final.to_csv(DF_OUT + FN_OUT, sep=',', index=False)
 print('\nNumber of folders opened:', ENTRY_COUNT)
 print('Total time elapsed:\n',
     time.strftime('%H hr : %M min : %S sec',
                     (time.gmtime(time.time() - start_time))))
-
 
 # Basic descriptives
 print(result_final.groupby(['ActionGeo_CountryCode']).size())
