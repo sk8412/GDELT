@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# 5/23/2023: Code written and provided by Dr. T. Camber Warren
+
 
 import math
 import time
@@ -25,21 +27,14 @@ def geo_dist(x1, y1, x2, y2, radius=6371):
     d = radius * c
     return d
 
-
-# Main data folder
-# DF_MAIN = 'C:\\Users\\2bowb\\Documents\\Thesis\\'
-# DF_MAIN = 'G:\\My Drive\\Theses\\Kyler\\'
-
 # GDELT file name
-FN_GDELT = 'results_filtered.csv'
-# FN_GDELT = 'thesis-gdelt-false-positives-master\\results_all_protest.csv'
+FN_GDELT = '/data2/skyler2/gdelt_protest_events/protest_events_all_v2.csv'
 
 # ICEWS file name
-FN_ICEWS = 'events.2022.20230106.tab'
-# FN_ICEWS = 'events.2022.20230106.tab'
+FN_ICEWS = '/data2/skyler2/events.2022.20230106.tab'
 
 # Output file name
-FN_OUT = 'results_tagged_v1.csv'
+FN_OUT = '/data2/skyler2/events_tagged_v2.csv'
 
 # Distance thresholds for matching events
 DIST_RADIUS = [30, 50, 70]
@@ -80,7 +75,7 @@ for index, row in idf.iterrows():
     idict[key].append(row[['Longitude', 'Latitude']].to_dict())
 
 # Filter GDELT
-gdf = pd.read_csv(BytesIO(gdat), sep='\t')
+gdf = pd.read_csv(BytesIO(gdat), sep=',') 
 cond = gdf['ActionGeo_FeatureID'].astype(str).apply(len) > 3
 gdf = gdf[cond].dropna(
     subset=['ActionGeo_FeatureID', 'ActionGeo_Long', 'ActionGeo_Lat'])
